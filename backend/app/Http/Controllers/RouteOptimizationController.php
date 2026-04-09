@@ -128,10 +128,11 @@ class RouteOptimizationController extends Controller
     public function storeVehicle(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name'      => 'required|string|max:100',
-            'capacity'  => 'required|numeric|min:1',
-            'start_lat' => 'required|numeric|between:-90,90',
-            'start_lng' => 'required|numeric|between:-180,180',
+            'name'          => 'required|string|max:100',
+            'start_address' => 'nullable|string|max:255',
+            'capacity'      => 'required|numeric|min:1',
+            'start_lat'     => 'required|numeric|between:-90,90',
+            'start_lng'     => 'required|numeric|between:-180,180',
         ]);
 
         $vehicle = Vehicle::create($data);

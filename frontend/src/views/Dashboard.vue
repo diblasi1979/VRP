@@ -56,15 +56,21 @@
       <aside class="side-panel">
         <!-- Vehículos -->
         <section class="card">
-          <h2 class="card__title">🚚 Vehículos</h2>
+          <h2 class="card__title">
+            🚚 Vehículos
+            <button class="btn-add" title="Agregar vehículo" @click="showVehicleModal = true">+</button>
+          </h2>
           <ul class="vehicle-list">
             <li v-for="v in vehicles" :key="v.id" class="vehicle-item">
               <span
                 class="vehicle-dot"
                 :style="{ background: vehicleColor[v.id] ?? '#94a3b8' }"
               />
-              <span class="vehicle-name">{{ v.name }}</span>
-              <span class="vehicle-cap">{{ v.capacity }} kg</span>
+              <span class="vehicle-info">
+                <span class="vehicle-name">{{ v.name }}</span>
+                <span v-if="v.start_address" class="vehicle-origin">📍 {{ v.start_address }}</span>
+              </span>
+              <span class="vehicle-cap">{{ v.capacity }} kg</span>
             </li>
             <li v-if="vehicles.length === 0" class="list-empty">Sin vehículos cargados.</li>
           </ul>
@@ -83,7 +89,44 @@
       <h2 class="card__title">📋 Rutas Generadas</h2>
       <RouteList :routes="routes" />
     </section>
-  </div>
+    <!-- ── Modal: agregar vehículo ────────────────────────────────────────────── -->
+    <transition name="fade">
+      <div v-if="showVehicleModal" class="modal-overlay" @click.self="showVehicleModal = false">
+        <div class="modal">
+          <h3 class="modal__title">🚚 Agregar Vehículo</h3>
+          <form class="modal__form" @submit.prevent="handleAddVehicle">
+            <label class="modal__label">
+              Nombre *
+              <input v-model="vForm.name" required maxlength="100" placeholder="Furgón BA-04" />
+            </label>
+            <label class="modal__label">
+              Dirección de origen
+              <input v-model="vForm.start_address" placeholder="Av. Caseros 2900, Parque Patricios, CABA" />
+            </label>
+            <div class="modal__row">
+              <label class="modal__label">
+                Capacidad (kg) *
+                <input v-model.number="vForm.capacity" type="number" min="1" step="0.01" required placeholder="500" />
+              </label>
+            </div>
+            <div class="modal__row">
+              <label class="modal__label">
+                Latitud *
+                <input v-model.number="vForm.start_lat" type="number" step="any" required placeholder="-34.6345" />
+              </label>
+              <label class="modal__label">
+                Longitud *
+                <input v-model.number="vForm.start_lng" type="number" step="any" required placeholder="-58.4012" />
+              </label>
+            </div>
+            <div class="modal__actions">
+              <button type="button" class="btn-secondary" @click="showVehicleModal = false">Cancelar</button>
+              <button type="submit" class="btn-primary" :disabled="loading">Guardar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </transition>  </div>
 </template>
 
 <script setup>
@@ -108,6 +151,9 @@ const routes   = ref([])
 const loading  = ref(false)
 const alert    = ref(null)
 
+const showVehicleModal = ref(false)
+const vForm = ref({ name: '', start_address: '', capacity: '', start_lat: '', start_lng: '' })
+
 // -----------------------------------------------------------------------
 // Carga inicial
 // -----------------------------------------------------------------------
@@ -126,6 +172,25 @@ async function loadAll() {
   } catch (err) {
     showAlert('error', 'No se pudo conectar con el backend. ¿Está Laravel corriendo en :8000?')
     console.error(err)
+  }
+}
+
+// -----------------------------------------------------------------------
+// Agregar vehículo
+// -----------------------------------------------------------------------
+async function handleAddVehicle() {
+  loading.value = true
+  try {
+    await vrpApi.createVehicle(vForm.value)
+    showVehicleModal.value = false
+    vForm.value = { name: '', start_address: '', capacity: '', start_lat: '', start_lng: '' }
+    await loadAll()
+    showAlert('success', 'Vehículo agregado correctamente.')
+  } catch (err) {
+    const msg = err.response?.data?.message ?? 'Error al guardar el vehículo.'
+    showAlert('error', msg)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -255,9 +320,60 @@ function showAlert(type, message) {
 .vehicle-item  { display: flex; align-items: center; gap: .5rem; font-size: .85rem; padding: .35rem 0; border-bottom: 1px solid var(--color-border); }
 .vehicle-item:last-child { border: none; }
 .vehicle-dot   { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(0,0,0,.08); }
-.vehicle-name  { font-weight: 600; flex: 1; }
+.vehicle-info  { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.vehicle-name  { font-weight: 600; }
+.vehicle-origin { font-size: .75rem; color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vehicle-cap   { color: var(--color-muted); white-space: nowrap; }
 .list-empty    { color: var(--color-muted); font-style: italic; font-size: .85rem; }
+.btn-add {
+  margin-left: auto;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 22px; height: 22px;
+  font-size: 1rem; line-height: 1;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.btn-add:hover { background: #1d4ed8; }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0,0,0,.22);
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 420px;
+}
+.modal__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+.modal__form  { display: flex; flex-direction: column; gap: .75rem; }
+.modal__label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; font-weight: 500; }
+.modal__label input {
+  padding: .45rem .6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: .9rem;
+  outline: none;
+}
+.modal__label input:focus { border-color: var(--color-primary); }
+.modal__row    { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.modal__actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .25rem; }
 
 /* ── Responsive ── */
 @media (max-width: 900px) {

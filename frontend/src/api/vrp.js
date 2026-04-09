@@ -24,6 +24,10 @@ export default {
     return api.get('/vehicles')
   },
 
+  createVehicle(data) {
+    return api.post('/vehicles', data)
+  },
+
   // Rutas
   getRoutes() {
     return api.get('/routes')

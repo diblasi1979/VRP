@@ -12,6 +12,7 @@ class Vehicle extends Model
 
     protected $fillable = [
         'name',
+        'start_address',
         'capacity',
         'start_lat',
         'start_lng',
