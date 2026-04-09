@@ -50,7 +50,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -84,6 +84,7 @@ const expanded = ref(true)
 const focused  = ref(null)   // índice de ruta filtrada, null = todas
 
 let map = null
+let depotMarker = null   // referencia al marcador del depósito
 
 // Grupos por ruta: [{ group: L.LayerGroup, idx: number }]
 const routeGroups = []
@@ -91,7 +92,10 @@ const routeGroups = []
 const orderMarkers = {}
 
 // ─── Ciclo de vida ───────────────────────────────────────────────────────────
-onMounted(() => {
+onMounted(async () => {
+  // nextTick garantiza que el div ya tiene dimensiones reales en el DOM
+  await nextTick()
+
   map = L.map(mapRef.value, { center: props.depot, zoom: 11 })
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -101,6 +105,9 @@ onMounted(() => {
 
   renderDepot()
   renderAll()
+
+  // Fuerza a Leaflet a recalcular el viewport tras el primer paint
+  setTimeout(() => map?.invalidateSize(), 200)
 })
 
 onUnmounted(() => { if (map) { map.remove(); map = null } })
@@ -108,12 +115,19 @@ onUnmounted(() => { if (map) { map.remove(); map = null } })
 // ─── Watch combinado — reacciona a cambios en pedidos O rutas ────────────────
 watch(
   () => [props.orders, props.routes],
-  () => { clearAll(); renderAll() },
+  async () => {
+    await nextTick()
+    clearAll()
+    renderAll()
+    map?.invalidateSize()
+  },
   { deep: true }
 )
 
 // ─── Depósito ────────────────────────────────────────────────────────────────
 function renderDepot() {
+  if (depotMarker) return   // ya está en el mapa, no duplicar
+
   const html = `<div style="
     background:#1e293b;color:#fff;
     width:38px;height:38px;border-radius:50%;
@@ -121,7 +135,7 @@ function renderDepot() {
     font-size:18px;border:3px solid #fff;
     box-shadow:0 3px 10px rgba(0,0,0,.55);">🏭</div>`
 
-  L.marker(props.depot, {
+  depotMarker = L.marker(props.depot, {
     icon: L.divIcon({ className: '', html, iconSize: [38, 38], iconAnchor: [19, 19] }),
     zIndexOffset: 2000,
   })
@@ -286,9 +300,9 @@ function zoomToRoutes(routeIdx) {
   }
 }
 
-// ─── Limpiar todas las capas de rutas y pedidos ──────────────────────────────
+// ─── Limpiar capas de rutas y pedidos (el depósito se mantiene) ─────────────
 function clearAll() {
-  routeGroups.forEach(({ group }) => { group.clearLayers(); map.removeLayer(group) })
+  routeGroups.forEach(({ group }) => { group.clearLayers(); if (map.hasLayer(group)) map.removeLayer(group) })
   routeGroups.length = 0
   Object.values(orderMarkers).forEach((m) => m.remove())
   for (const k in orderMarkers) delete orderMarkers[k]
@@ -338,13 +352,17 @@ function interpolate(from, to, t) {
 .map-wrapper {
   position: relative;
   border-radius: var(--radius);
-  overflow: hidden;
   box-shadow: var(--shadow);
-  height: 100%;
-  min-height: 420px;
+  /* NO overflow:hidden — la eliminamos para que Leaflet no quede recortado */
 }
 
-.leaflet-map { height: 100%; width: 100%; }
+.leaflet-map {
+  /* Altura fija explícita: Leaflet no funciona bien con height:100%
+     dentro de flex/grid sin altura definida en el ancestro. */
+  height: 560px;
+  width: 100%;
+  border-radius: var(--radius);
+}
 
 /* ─── Leyenda flotante ───────────────────────────────────────────── */
 .map-legend {

@@ -61,4 +61,5 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .badge-delivered { background: #f0fdf4; color: #166534; }
 
 /* Prevent leaflet z-index issues */
-.leaflet-container { z-index: 0; }
+/* Leaflet necesita z-index positivo para renderizar tiles y controles */
+.leaflet-container { z-index: 1; }
