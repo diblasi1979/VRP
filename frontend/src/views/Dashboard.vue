@@ -59,8 +59,12 @@
           <h2 class="card__title">🚚 Vehículos</h2>
           <ul class="vehicle-list">
             <li v-for="v in vehicles" :key="v.id" class="vehicle-item">
+              <span
+                class="vehicle-dot"
+                :style="{ background: vehicleColor[v.id] ?? '#94a3b8' }"
+              />
               <span class="vehicle-name">{{ v.name }}</span>
-              <span class="vehicle-cap">Capacidad: {{ v.capacity }} kg</span>
+              <span class="vehicle-cap">{{ v.capacity }} kg</span>
             </li>
             <li v-if="vehicles.length === 0" class="list-empty">Sin vehículos cargados.</li>
           </ul>
@@ -83,11 +87,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import MapView   from '../components/MapView.vue'
 import RouteList from '../components/RouteList.vue'
 import OrderList from '../components/OrderList.vue'
 import vrpApi    from '../api/vrp.js'
+
+// Paleta sincronizada con MapView y RouteList
+const ROUTE_PALETTE = [
+  '#2563eb', '#dc2626', '#16a34a', '#d97706',
+  '#7c3aed', '#0891b2', '#be185d', '#0d9488',
+]
 
 // -----------------------------------------------------------------------
 // Estado
@@ -153,6 +163,17 @@ async function handleClear() {
     loading.value = false
   }
 }
+
+// -----------------------------------------------------------------------
+// Color de ruta por vehículo
+// -----------------------------------------------------------------------
+const vehicleColor = computed(() => {
+  const map = {}
+  routes.value.forEach((r, idx) => {
+    map[r.vehicle_id] = ROUTE_PALETTE[idx % ROUTE_PALETTE.length]
+  })
+  return map
+})
 
 // -----------------------------------------------------------------------
 // Alertas
@@ -225,20 +246,18 @@ function showAlert(type, message) {
 }
 
 .map-section { display: flex; flex-direction: column; }
-.map-view    { flex: 1; min-height: 450px; }
+.map-view    { flex: 1; min-height: 560px; }
 
 .side-panel { display: flex; flex-direction: column; gap: 1.25rem; }
 
 /* ── Vehículos ── */
 .vehicle-list  { list-style: none; display: flex; flex-direction: column; gap: .4rem; }
-.vehicle-item  { display: flex; justify-content: space-between; font-size: .85rem; padding: .35rem 0; border-bottom: 1px solid var(--color-border); }
+.vehicle-item  { display: flex; align-items: center; gap: .5rem; font-size: .85rem; padding: .35rem 0; border-bottom: 1px solid var(--color-border); }
 .vehicle-item:last-child { border: none; }
-.vehicle-name  { font-weight: 600; }
-.vehicle-cap   { color: var(--color-muted); }
+.vehicle-dot   { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(0,0,0,.08); }
+.vehicle-name  { font-weight: 600; flex: 1; }
+.vehicle-cap   { color: var(--color-muted); white-space: nowrap; }
 .list-empty    { color: var(--color-muted); font-style: italic; font-size: .85rem; }
-
-/* ── Rutas ── */
-.routes-section { }
 
 /* ── Responsive ── */
 @media (max-width: 900px) {
