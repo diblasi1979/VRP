@@ -1,0 +1,64 @@
+/* =========================================================
+   VRP TMS — Estilos globales
+   ========================================================= */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --color-bg:       #f0f4f8;
+  --color-surface:  #ffffff;
+  --color-primary:  #2563eb;
+  --color-primary-h:#1d4ed8;
+  --color-success:  #16a34a;
+  --color-warning:  #d97706;
+  --color-danger:   #dc2626;
+  --color-text:     #1e293b;
+  --color-muted:    #64748b;
+  --color-border:   #e2e8f0;
+  --radius:         8px;
+  --shadow:         0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+a { color: var(--color-primary); text-decoration: none; }
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius);
+  padding: .5rem 1rem;
+  font-size: .875rem;
+  font-weight: 600;
+  transition: background .15s, opacity .15s;
+}
+
+button:disabled { opacity: .55; cursor: not-allowed; }
+
+.btn-primary   { background: var(--color-primary);   color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-h); }
+
+.btn-danger    { background: var(--color-danger);    color: #fff; }
+.btn-secondary { background: var(--color-border);    color: var(--color-text); }
+
+.badge {
+  display: inline-block;
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.badge-pending   { background: #fef3c7; color: #92400e; }
+.badge-assigned  { background: #dbeafe; color: #1e40af; }
+.badge-optimized { background: #d1fae5; color: #065f46; }
+.badge-delivered { background: #f0fdf4; color: #166534; }
+
+/* Prevent leaflet z-index issues */
+.leaflet-container { z-index: 0; }

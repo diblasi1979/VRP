@@ -1,0 +1,27 @@
+# ─── Backend Laravel ───────────────────────────────────────
+backend/vendor/
+backend/.env
+backend/.env.backup
+backend/storage/logs/*.log
+backend/storage/framework/cache/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+backend/bootstrap/cache/packages.php
+backend/bootstrap/cache/services.php
+backend/database/database.sqlite
+backend/.phpunit.cache/
+backend/.php-cs-fixer.cache
+
+# ─── Frontend Vue / Node ────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# ─── Editor / OS ────────────────────────────────────────────
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+*.swp
+*.swo
