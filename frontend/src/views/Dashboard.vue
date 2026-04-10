@@ -13,12 +13,21 @@
         </p>
       </div>
       <div class="action-bar__buttons">
+        <label class="vehicle-selector">
+          <span class="vehicle-selector__label">Vehículo libre</span>
+          <select v-model="selectedVehicleId" :disabled="loading || availableVehicles.length === 0">
+            <option value="">Seleccionar vehículo</option>
+            <option v-for="vehicle in availableVehicles" :key="vehicle.id" :value="String(vehicle.id)">
+              {{ vehicle.name }} · {{ vehicle.capacity }} kg
+            </option>
+          </select>
+        </label>
         <button
           class="btn-primary"
-          :disabled="loading"
+          :disabled="loading || !selectedVehicleId"
           @click="handleOptimize"
         >
-          {{ loading ? '⏳ Optimizando…' : '🚀 Optimizar Rutas' }}
+          {{ loading ? '⏳ Generando…' : '🚀 Generar Ruta' }}
         </button>
         <button
           class="btn-secondary"
@@ -73,6 +82,9 @@
                 <span v-if="v.start_address" class="vehicle-origin">📍 {{ v.start_address }}</span>
               </span>
               <span class="vehicle-cap">{{ v.capacity }} kg</span>
+              <span :class="['vehicle-status', v.is_available ? 'vehicle-status--available' : 'vehicle-status--busy']">
+                {{ v.is_available ? 'Libre' : 'Ocupado' }}
+              </span>
             </li>
             <li v-if="vehicles.length === 0" class="list-empty">Sin vehículos cargados.</li>
           </ul>
@@ -176,6 +188,7 @@ const completedRoutes = ref([])
 const loading  = ref(false)
 const alert    = ref(null)
 const loadingOrderIds = ref([])
+const selectedVehicleId = ref('')
 
 const showVehicleModal = ref(false)
 const vForm = ref({ name: '', start_address: '', capacity: '', start_lat: '', start_lng: '' })
@@ -197,6 +210,7 @@ async function loadAll() {
     vehicles.value = vehiclesRes.data.data
     routes.value   = routesRes.data.data
     completedRoutes.value = completedRoutesRes.data.data
+    syncSelectedVehicle()
   } catch (err) {
     showAlert('error', 'No se pudo conectar con el backend. ¿Está Laravel corriendo en :8000?')
     console.error(err)
@@ -226,10 +240,15 @@ async function handleAddVehicle() {
 // Optimizar
 // -----------------------------------------------------------------------
 async function handleOptimize() {
+  if (!selectedVehicleId.value) {
+    showAlert('error', 'Seleccioná un vehículo libre antes de generar la ruta.')
+    return
+  }
+
   loading.value = true
   alert.value   = null
   try {
-    const res = await vrpApi.optimizeRoutes()
+    const res = await vrpApi.optimizeRoutes(Number(selectedVehicleId.value))
     showAlert('success', res.data.message)
     await loadAll()
   } catch (err) {
@@ -286,6 +305,10 @@ const vehicleColor = computed(() => {
   return map
 })
 
+const availableVehicles = computed(() => {
+  return vehicles.value.filter((vehicle) => vehicle.is_available)
+})
+
 const totalDistanceKm = computed(() => {
   return routes.value.reduce((sum, route) => sum + getRouteDistanceKm(route), 0)
 })
@@ -304,6 +327,14 @@ function getRouteDistanceKm(route) {
 
 function formatRouteDistance(route) {
   return `${getRouteDistanceKm(route).toFixed(1)} km`
+}
+
+function syncSelectedVehicle() {
+  if (availableVehicles.value.some((vehicle) => String(vehicle.id) === selectedVehicleId.value)) {
+    return
+  }
+
+  selectedVehicleId.value = availableVehicles.value[0] ? String(availableVehicles.value[0].id) : ''
 }
 
 // -----------------------------------------------------------------------
@@ -336,6 +367,24 @@ function showAlert(type, message) {
 .action-bar__title { font-size: 1.4rem; font-weight: 700; }
 .action-bar__sub   { font-size: .85rem; color: var(--color-muted); margin-top: .1rem; }
 .action-bar__buttons { display: flex; gap: .5rem; flex-wrap: wrap; }
+.vehicle-selector {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  min-width: 240px;
+}
+.vehicle-selector__label {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+.vehicle-selector select {
+  min-height: 40px;
+  padding: .45rem .75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: #fff;
+}
 
 /* ── Alerta ── */
 .alert {
@@ -425,6 +474,21 @@ function showAlert(type, message) {
 .vehicle-name  { font-weight: 600; }
 .vehicle-origin { font-size: .75rem; color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vehicle-cap   { color: var(--color-muted); white-space: nowrap; }
+.vehicle-status {
+  padding: .2rem .5rem;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.vehicle-status--available {
+  background: #dcfce7;
+  color: #166534;
+}
+.vehicle-status--busy {
+  background: #fee2e2;
+  color: #991b1b;
+}
 .list-empty    { color: var(--color-muted); font-style: italic; font-size: .85rem; }
 .btn-add {
   margin-left: auto;

@@ -27,14 +27,14 @@ Sistema de gestión de transporte (**TMS**) con optimización de rutas VRP (*Veh
 
 ## Descripción General
 
-VRP TMS permite optimizar la distribución de pedidos entre múltiples vehículos teniendo en cuenta:
+VRP TMS permite generar rutas optimizadas a partir de un vehículo libre seleccionado, teniendo en cuenta:
 
 - **Capacidad de carga** de cada vehículo (kg)
 - **Ventanas horarias** de entrega por pedido (ej. 09:00–12:00)
 - **Ubicación geográfica** de cada pedido (lat/lng)
 - **Depósito central** como punto de inicio y fin de cada ruta
 
-El resultado es un conjunto de rutas optimizadas que minimizan la distancia total y respetan las restricciones operativas.
+El resultado es una ruta optimizada para el vehículo elegido, respetando su límite de carga y las restricciones operativas de los pedidos compatibles.
 
 ---
 
@@ -316,11 +316,19 @@ Base URL: `http://localhost:8000/api`
 | `POST` | `/orders` | Crea un nuevo pedido |
 | `PATCH` | `/orders/{id}/status` | Actualiza el estado de u
 .n pedido |
-| `GET` | `/vehicles` | Lista todos los vehículos |
+| `GET` | `/vehicles` | Lista todos los vehículos e informa si están libres mediante `is_available` |
 | `POST` | `/vehicles` | Crea un nuevo vehículo |
 | `GET` | `/routes` | Lista rutas con vehículo y paradas. Acepta `?status=active|pending|optimized|in_progress|completed`, `?vehicle_id=` y `?date_from=&date_to=` |
 | `DELETE` | `/routes` | Elimina solo rutas activas y restablece pedidos `assigned` a `pending` |
-| `POST` | `/optimize-routes` | **Endpoint principal**: ejecuta la optimización VRP |
+| `POST` | `/optimize-routes` | **Endpoint principal**: ejecuta la optimización VRP para un `vehicle_id` libre |
+
+### Ejemplo — POST /api/optimize-routes
+
+```json
+{
+  "vehicle_id": 1
+}
+```
 
 ### Ejemplo — POST /api/orders
 
@@ -341,7 +349,7 @@ Base URL: `http://localhost:8000/api`
 ```json
 {
   "success": true,
-  "message": "3 ruta(s) optimizadas correctamente.",
+  "message": "1 ruta(s) optimizadas correctamente para Furgón BA-01.",
   "data": [
     {
       "id": 1,
@@ -402,12 +410,14 @@ Errores mapeados: 401 (key inválida), 403 (límites de plan), 429 (rate limit).
 
 Orquestador principal:
 
-1. Carga pedidos `pending` y vehículos `is_active = true`
-2. Construye el payload VRP (jobs + vehicles) en formato ORS
-3. Llama a `OpenRouteServiceClient::optimize()`
-4. Persiste rutas y paradas en una transacción DB
-5. Marca los pedidos involucrados como `assigned`
-6. Cuando todas las paradas de una ruta se informan como entregadas, la ruta pasa a `completed` y queda disponible para consultas históricas
+1. Recibe el `vehicle_id` seleccionado desde la UI
+2. Valida que el vehículo esté `is_active = true` y sin rutas activas
+3. Filtra pedidos `pending` cuyo peso no supere la capacidad del vehículo
+4. Construye el payload VRP (jobs + vehículo) en formato ORS
+5. Llama a `OpenRouteServiceClient::optimize()`
+6. Persiste la ruta y sus paradas en una transacción DB
+7. Marca los pedidos involucrados como `assigned`
+8. Cuando todas las paradas de una ruta se informan como entregadas, la ruta pasa a `completed` y queda disponible para consultas históricas
 
 ---
 
@@ -415,9 +425,9 @@ Orquestador principal:
 
 ### `Dashboard.vue`
 
-Vista principal. Gestiona estado global (ordenes, vehículos, rutas activas e historial), acciones (optimizar, limpiar, recargar) y muestra alertas con auto-cierre a los 6 segundos.
+Vista principal. Gestiona estado global (ordenes, vehículos, rutas activas e historial), acciones (generar ruta, limpiar, recargar) y muestra alertas con auto-cierre a los 6 segundos.
 
-Además permite marcar una parada como entregada desde la propia lista de rutas activas. Cuando todas las paradas de una ruta quedan entregadas, la ruta pasa automáticamente al historial.
+Antes de optimizar, obliga a seleccionar un vehículo libre y muestra su disponibilidad en la lista. Además permite marcar una parada como entregada desde la propia lista de rutas activas. Cuando todas las paradas de una ruta quedan entregadas, la ruta pasa automáticamente al historial.
 
 ### `History.vue`
 
@@ -426,7 +436,7 @@ Pantalla dedicada a consultas históricas:
 - Filtro por vehículo
 - Filtro por rango de fechas
 - Resumen de rutas, kilómetros y paradas completadas
-- Reutiliza `RouteList.vue` para visualizar las rutas completadas
+- Lista rutas completadas y abre un modal con el detalle histórico de paradas
 
 ### `MapView.vue`
 
@@ -454,28 +464,27 @@ Lista filtrable de pedidos por estado (`Todos / Pendientes / Asignados / Entrega
 ## Flujo de Optimización
 
 ```
-Usuario pulsa "Optimizar Rutas"
+Usuario selecciona un vehículo libre en el dashboard
+  │
+  ▼
+POST /api/optimize-routes { vehicle_id }
         │
         ▼
-POST /api/optimize-routes
+RouteOptimizerService::optimize(vehicle_id)
         │
-        ▼
-RouteOptimizerService::optimize()
-        │
-        ├─ 1. Carga pedidos (status = 'pending')
-        ├─ 2. Carga vehículos (is_active = true)
-        ├─ 3. Construye payload VRP:
+  ├─ 1. Valida que el vehículo siga libre
+  ├─ 2. Carga pedidos (status = 'pending') compatibles con su capacidad
+  ├─ 3. Construye payload VRP:
         │       jobs:     [{ id, location:[lng,lat], amount:[kg], time_windows:[[ts_start,ts_end]] }]
-        │       vehicles: [{ id, profile:'driving-car', start:[lng,lat], end:[lng,lat], capacity:[kg] }]
+  │       vehicles: [{ id, profile:'driving-car', start:[lng,lat], end:[lng,lat], capacity:[kg] }]
         │
         ├─ 4. POST https://api.openrouteservice.org/optimization
         │
         ├─ 5. Parsea respuesta ORS:
-        │       routes[].steps (type='job') → secuencia de entregas por vehículo
+  │       routes[].steps (type='job') → secuencia de entregas del vehículo seleccionado
         │
         └─ 6. DB Transaction:
-                - Borra rutas/paradas previas
-                - Crea Route por cada vehículo con paradas
+    - Crea Route para el vehículo elegido con sus paradas
                 - Actualiza orders.status → 'assigned'
 ```
 

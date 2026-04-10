@@ -10,6 +10,10 @@ class Vehicle extends Model
 {
     use HasFactory;
 
+    protected $appends = [
+        'is_available',
+    ];
+
     protected $fillable = [
         'name',
         'start_address',
@@ -29,5 +33,19 @@ class Vehicle extends Model
     public function routes(): HasMany
     {
         return $this->hasMany(Route::class);
+    }
+
+    public function activeRoutes(): HasMany
+    {
+        return $this->hasMany(Route::class)->whereIn('status', ['pending', 'optimized', 'in_progress']);
+    }
+
+    public function getIsAvailableAttribute(): bool
+    {
+        if (array_key_exists('active_routes_count', $this->attributes)) {
+            return (int) $this->attributes['active_routes_count'] === 0;
+        }
+
+        return !$this->activeRoutes()->exists();
     }
 }

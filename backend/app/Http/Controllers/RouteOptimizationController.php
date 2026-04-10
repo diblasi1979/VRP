@@ -26,14 +26,19 @@ class RouteOptimizationController extends Controller
     /**
      * Lanza la optimización VRP y devuelve las rutas generadas.
      */
-    public function optimize(): JsonResponse
+    public function optimize(Request $request): JsonResponse
     {
+        $data = $request->validate([
+            'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
+        ]);
+
         try {
-            $routes = $this->optimizer->optimize();
+            $vehicle = Vehicle::findOrFail($data['vehicle_id']);
+            $routes = $this->optimizer->optimize($vehicle->id);
 
             return response()->json([
                 'success' => true,
-                'message' => count($routes) . ' ruta(s) optimizadas correctamente.',
+                'message' => count($routes) . ' ruta(s) optimizadas correctamente para ' . $vehicle->name . '.',
                 'data'    => $routes,
             ]);
         } catch (RuntimeException $e) {
@@ -148,7 +153,9 @@ class RouteOptimizationController extends Controller
 
     public function vehicles(): JsonResponse
     {
-        $vehicles = Vehicle::orderBy('name')->get();
+        $vehicles = Vehicle::withCount('activeRoutes')
+            ->orderBy('name')
+            ->get();
 
         return response()->json(['success' => true, 'data' => $vehicles]);
     }

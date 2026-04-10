@@ -42,7 +42,7 @@ export default {
   },
 
   // Optimización
-  optimizeRoutes() {
-    return api.post('/optimize-routes')
+  optimizeRoutes(vehicleId) {
+    return api.post('/optimize-routes', { vehicle_id: vehicleId })
   },
 }

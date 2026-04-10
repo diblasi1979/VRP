@@ -33,21 +33,33 @@ class RouteOptimizerService
      *
      * @return array  Rutas creadas con sus paradas (con relaciones cargadas)
      */
-    public function optimize(): array
+    public function optimize(int $vehicleId): array
     {
         $orders   = Order::where('status', 'pending')->get();
-        $vehicles = Vehicle::where('is_active', true)->get();
+        $vehicle = Vehicle::where('is_active', true)->find($vehicleId);
 
         if ($orders->isEmpty()) {
             throw new RuntimeException('No hay pedidos pendientes para optimizar.');
         }
 
-        if ($vehicles->isEmpty()) {
-            throw new RuntimeException('No hay vehículos activos disponibles.');
+        if (!$vehicle) {
+            throw new RuntimeException('El vehículo seleccionado no existe o no está activo.');
+        }
+
+        if ($vehicle->activeRoutes()->exists()) {
+            throw new RuntimeException('El vehículo seleccionado ya tiene una ruta activa y no está libre.');
+        }
+
+        $compatibleOrders = $orders
+            ->filter(fn (Order $order) => $order->weight <= $vehicle->capacity)
+            ->values();
+
+        if ($compatibleOrders->isEmpty()) {
+            throw new RuntimeException('No hay pedidos pendientes compatibles con la capacidad del vehículo seleccionado.');
         }
 
         // Construir el payload VRP
-        $payload = $this->buildPayload($orders, $vehicles);
+        $payload = $this->buildPayload($compatibleOrders, collect([$vehicle]));
 
         Log::info('VRP payload enviado a ORS', ['jobs' => count($payload['jobs']), 'vehicles' => count($payload['vehicles'])]);
 
@@ -57,7 +69,7 @@ class RouteOptimizerService
         Log::info('VRP respuesta recibida de ORS', ['routes' => count($response['routes'] ?? [])]);
 
         // Persistir y retornar
-        return $this->persistRoutes($response, $orders, $vehicles);
+        return $this->persistRoutes($response, $compatibleOrders, collect([$vehicle]));
     }
 
     // -----------------------------------------------------------------------
@@ -109,7 +121,7 @@ class RouteOptimizerService
     {
         if (empty($orsResponse['routes'])) {
             throw new RuntimeException(
-                'ORS no devolvió rutas. Puede que algunos pedidos sean inviables dentro de las ventanas horarias.'
+                'ORS no devolvió rutas para el vehículo seleccionado. Puede que los pedidos compatibles no sean viables dentro de las ventanas horarias.'
             );
         }
 
