@@ -29,8 +29,12 @@ export default {
   },
 
   // Rutas
-  getRoutes(status = null) {
-    return api.get('/routes', { params: status ? { status } : {} })
+  getRoutes(filters = null) {
+    const params = typeof filters === 'string'
+      ? { status: filters }
+      : (filters ?? {})
+
+    return api.get('/routes', { params })
   },
 
   clearRoutes() {

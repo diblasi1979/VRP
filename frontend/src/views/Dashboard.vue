@@ -95,7 +95,7 @@
           <strong class="route-summary-item__value">{{ formatRouteDistance(route) }}</strong>
         </div>
       </div>
-      <RouteList :routes="routes" />
+      <RouteList :routes="routes" :allow-delivery="true" :loading-order-ids="loadingOrderIds" @mark-delivered="handleMarkDelivered" />
     </section>
 
     <section class="card routes-section">
@@ -175,6 +175,7 @@ const routes   = ref([])
 const completedRoutes = ref([])
 const loading  = ref(false)
 const alert    = ref(null)
+const loadingOrderIds = ref([])
 
 const showVehicleModal = ref(false)
 const vForm = ref({ name: '', start_address: '', capacity: '', start_lat: '', start_lng: '' })
@@ -253,6 +254,24 @@ async function handleClear() {
     showAlert('error', 'Error al eliminar rutas.')
   } finally {
     loading.value = false
+  }
+}
+
+async function handleMarkDelivered(order) {
+  if (!order?.id) {
+    return
+  }
+
+  loadingOrderIds.value = [...loadingOrderIds.value, order.id]
+
+  try {
+    await vrpApi.updateOrderStatus(order.id, 'delivered')
+    showAlert('success', `Pedido #${order.id} marcado como entregado.`)
+    await loadAll()
+  } catch (err) {
+    showAlert('error', err.response?.data?.message ?? 'No se pudo marcar la parada como entregada.')
+  } finally {
+    loadingOrderIds.value = loadingOrderIds.value.filter((id) => id !== order.id)
   }
 }
 

@@ -62,6 +62,9 @@ class RouteOptimizationController extends Controller
     {
         $request->validate([
             'status' => ['nullable', Rule::in(['active', 'pending', 'optimized', 'in_progress', 'completed'])],
+            'vehicle_id' => ['nullable', 'integer', 'exists:vehicles,id'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
         ]);
 
         $query = Route::with(['vehicle', 'stops.order']);
@@ -71,6 +74,20 @@ class RouteOptimizationController extends Controller
             'pending', 'optimized', 'in_progress', 'completed' => $query->where('status', $request->status),
             default => null,
         };
+
+        if ($request->filled('vehicle_id')) {
+            $query->where('vehicle_id', $request->integer('vehicle_id'));
+        }
+
+        if ($request->filled('date_from')) {
+            $column = $request->input('status') === 'completed' ? 'completed_at' : 'optimized_at';
+            $query->whereDate($column, '>=', $request->date('date_from')->toDateString());
+        }
+
+        if ($request->filled('date_to')) {
+            $column = $request->input('status') === 'completed' ? 'completed_at' : 'optimized_at';
+            $query->whereDate($column, '<=', $request->date('date_to')->toDateString());
+        }
 
         $routes = $query
             ->orderByDesc('completed_at')

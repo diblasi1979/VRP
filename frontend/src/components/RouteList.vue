@@ -15,7 +15,7 @@
         <span class="route-card__dot" />
         <div class="route-card__title">
           <strong>{{ route.vehicle?.name ?? `Vehículo #${route.vehicle_id}` }}</strong>
-          <span class="badge badge-optimized">{{ route.status }}</span>
+          <span :class="['badge', `badge-${route.status}`]">{{ route.status }}</span>
         </div>
         <div v-if="route.total_distance_km !== null" class="route-card__distance">
           <span class="route-card__distance-label">Distancia</span>
@@ -38,6 +38,7 @@
           <div class="stop-info">
             <span class="stop-address">{{ stop.order?.address ?? `Pedido #${stop.order_id}` }}</span>
             <div class="stop-details">
+              <span v-if="stop.order" :class="['badge', `badge-${stop.order.status}`]">{{ stop.order.status }}</span>
               <span v-if="stop.estimated_arrival">🕐 {{ stop.estimated_arrival }}</span>
               <span v-if="stop.order">⚖ {{ stop.order.weight }} kg</span>
               <span v-if="stop.order">
@@ -45,6 +46,14 @@
               </span>
             </div>
           </div>
+          <button
+            v-if="allowDelivery && stop.order && stop.order.status !== 'delivered'"
+            class="btn-primary stop-action"
+            :disabled="loadingOrderIds.includes(stop.order.id)"
+            @click="$emit('mark-delivered', stop.order)"
+          >
+            {{ loadingOrderIds.includes(stop.order.id) ? 'Guardando…' : 'Entregar' }}
+          </button>
         </li>
       </ol>
     </div>
@@ -52,8 +61,12 @@
 </template>
 
 <script setup>
+defineEmits(['mark-delivered'])
+
 defineProps({
   routes: { type: Array, default: () => [] },
+  allowDelivery: { type: Boolean, default: false },
+  loadingOrderIds: { type: Array, default: () => [] },
 })
 
 function formatDistance(route) {
@@ -141,6 +154,16 @@ const routeColors = [
   display: flex;
   align-items: flex-start;
   gap: .6rem;
+}
+
+.stop-info {
+  flex: 1;
+}
+
+.stop-action {
+  align-self: center;
+  white-space: nowrap;
+  padding: .4rem .75rem;
 }
 
 .stop-seq {

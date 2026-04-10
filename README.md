@@ -314,10 +314,11 @@ Base URL: `http://localhost:8000/api`
 |---|---|---|
 | `GET` | `/orders` | Lista todos los pedidos. Acepta `?status=pending\|assigned\|delivered` |
 | `POST` | `/orders` | Crea un nuevo pedido |
-| `PATCH` | `/orders/{id}/status` | Actualiza el estado de un pedido |
+| `PATCH` | `/orders/{id}/status` | Actualiza el estado de u
+.n pedido |
 | `GET` | `/vehicles` | Lista todos los vehículos |
 | `POST` | `/vehicles` | Crea un nuevo vehículo |
-| `GET` | `/routes` | Lista rutas con vehículo y paradas. Acepta `?status=active|pending|optimized|in_progress|completed` |
+| `GET` | `/routes` | Lista rutas con vehículo y paradas. Acepta `?status=active|pending|optimized|in_progress|completed`, `?vehicle_id=` y `?date_from=&date_to=` |
 | `DELETE` | `/routes` | Elimina solo rutas activas y restablece pedidos `assigned` a `pending` |
 | `POST` | `/optimize-routes` | **Endpoint principal**: ejecuta la optimización VRP |
 
@@ -415,6 +416,17 @@ Orquestador principal:
 ### `Dashboard.vue`
 
 Vista principal. Gestiona estado global (ordenes, vehículos, rutas activas e historial), acciones (optimizar, limpiar, recargar) y muestra alertas con auto-cierre a los 6 segundos.
+
+Además permite marcar una parada como entregada desde la propia lista de rutas activas. Cuando todas las paradas de una ruta quedan entregadas, la ruta pasa automáticamente al historial.
+
+### `History.vue`
+
+Pantalla dedicada a consultas históricas:
+
+- Filtro por vehículo
+- Filtro por rango de fechas
+- Resumen de rutas, kilómetros y paradas completadas
+- Reutiliza `RouteList.vue` para visualizar las rutas completadas
 
 ### `MapView.vue`
 
