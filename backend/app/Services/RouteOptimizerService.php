@@ -33,7 +33,7 @@ class RouteOptimizerService
     /**
      * Ejecuta la optimización completa.
      *
-     * @return array  Rutas creadas con sus paradas (con relaciones cargadas)
+        * @return array{routes: array, unassigned_orders: array}  Resultado con rutas creadas y pedidos no asignados
      */
     public function optimize(int $vehicleId): array
     {
@@ -122,7 +122,9 @@ class RouteOptimizerService
      */
     private function persistRoutes(array $orsResponse, Collection $orders, Collection $vehicles): array
     {
-        if (empty($orsResponse['routes'])) {
+        $unassignedOrders = $this->resolveUnassignedOrders($orsResponse, $orders);
+
+        if (empty($orsResponse['routes']) && empty($orsResponse['unassigned'])) {
             throw new RuntimeException(
                 'ORS no devolvió rutas para el vehículo seleccionado. Puede que los pedidos compatibles no sean viables dentro de las ventanas horarias.'
             );
@@ -192,7 +194,10 @@ class RouteOptimizerService
             }
         });
 
-        return $createdRoutes;
+        return [
+            'routes' => $createdRoutes,
+            'unassigned_orders' => $unassignedOrders,
+        ];
     }
 
     // -----------------------------------------------------------------------
@@ -274,5 +279,17 @@ class RouteOptimizerService
     private function kmToMeters(?float $value): int
     {
         return max(1, (int) round(($value ?? 0) * 1000));
+    }
+
+    private function resolveUnassignedOrders(array $orsResponse, Collection $orders): array
+    {
+        $ordersById = $orders->keyBy('id');
+
+        return collect($orsResponse['unassigned'] ?? [])
+            ->pluck('id')
+            ->map(fn ($id) => $ordersById->get($id))
+            ->filter()
+            ->values()
+            ->all();
     }
 }

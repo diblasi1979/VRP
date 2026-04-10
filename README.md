@@ -322,7 +322,7 @@ Base URL: `http://localhost:8000/api`
 | `POST` | `/vehicles` | Crea un nuevo vehículo con capacidad y límite máximo de km por ruta |
 | `GET` | `/routes` | Lista rutas con vehículo y paradas. Acepta `?status=active|pending|optimized|in_progress|completed`, `?vehicle_id=` y `?date_from=&date_to=` |
 | `DELETE` | `/routes` | Elimina solo rutas activas y restablece pedidos `assigned` a `pending` |
-| `POST` | `/optimize-routes` | **Endpoint principal**: ejecuta la optimización VRP para un `vehicle_id` libre |
+| `POST` | `/optimize-routes` | **Endpoint principal**: ejecuta la optimización VRP para un `vehicle_id` libre y puede devolver `unassigned_orders` |
 
 ### Ejemplo — POST /api/optimize-routes
 
@@ -352,31 +352,36 @@ Base URL: `http://localhost:8000/api`
 {
   "success": true,
   "message": "1 ruta(s) optimizadas correctamente para Furgón BA-01.",
-  "data": [
-    {
-      "id": 1,
-      "vehicle_id": 1,
-      "total_distance": 45230,
-      "total_distance_km": 45.2,
-      "total_duration": 5400,
-      "status": "optimized",
-      "vehicle": { "id": 1, "name": "Furgón BA-01", "capacity": 800, "max_route_distance_km": 120 },
-      "stops": [
-        {
-          "stop_sequence": 1,
-          "estimated_arrival": "09:35",
-          "order": {
-            "address": "Av. Corrientes 1234, San Nicolás, CABA",
-            "weight": 42,
-            "time_window_start": "08:00",
-            "time_window_end": "11:00"
+  "data": {
+    "routes": [
+      {
+        "id": 1,
+        "vehicle_id": 1,
+        "total_distance": 45230,
+        "total_distance_km": 45.2,
+        "total_duration": 5400,
+        "status": "optimized",
+        "vehicle": { "id": 1, "name": "Furgón BA-01", "capacity": 800, "max_route_distance_km": 120 },
+        "stops": [
+          {
+            "stop_sequence": 1,
+            "estimated_arrival": "09:35",
+            "order": {
+              "address": "Av. Corrientes 1234, San Nicolás, CABA",
+              "weight": 42,
+              "time_window_start": "08:00",
+              "time_window_end": "11:00"
+            }
           }
-        }
-      ]
-    }
-  ]
+        ]
+      }
+    ],
+    "unassigned_orders": []
+  }
 }
 ```
+
+Si el vehículo seleccionado no puede cubrir todos los pedidos, la respuesta sigue siendo exitosa y `unassigned_orders` contendrá los pedidos que quedaron fuera de la optimización.
 
 ---
 
@@ -418,8 +423,9 @@ Orquestador principal:
 4. Construye el payload VRP (jobs + vehículo) en formato ORS, incluyendo `max_distance`
 5. Llama a `OpenRouteServiceClient::optimize()`
 6. Persiste la ruta y sus paradas en una transacción DB
-7. Marca los pedidos involucrados como `assigned`
-8. Cuando todas las paradas de una ruta se informan como entregadas, la ruta pasa a `completed` y queda disponible para consultas históricas
+7. Devuelve `unassigned_orders` cuando ORS no puede incluir algunos pedidos sin tratarlo automáticamente como error duro
+8. Marca los pedidos involucrados como `assigned`
+9. Cuando todas las paradas de una ruta se informan como entregadas, la ruta pasa a `completed` y queda disponible para consultas históricas
 
 ---
 
@@ -432,6 +438,8 @@ Vista principal. Gestiona estado global (ordenes, vehículos, rutas activas e hi
 Antes de optimizar, obliga a seleccionar un vehículo libre y muestra su disponibilidad en la lista. Además permite marcar una parada como entregada desde la propia lista de rutas activas. Cuando todas las paradas de una ruta quedan entregadas, la ruta pasa automáticamente al historial.
 
 Al dar de alta un vehículo, también se define su límite máximo de kilómetros por ruta y ese valor se muestra en la selección del dashboard.
+
+Si la optimización deja pedidos fuera por restricciones, el dashboard los muestra en una sección específica de pedidos no asignados.
 
 ### `History.vue`
 

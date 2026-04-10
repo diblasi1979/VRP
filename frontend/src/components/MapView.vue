@@ -24,7 +24,7 @@
               <span class="legend-meta">
                 {{ route.stops.length }} paradas
                 {{ route.total_distance ? '· ' + (route.total_distance / 1000).toFixed(1) + ' km' : '' }}
-                {{ route.total_duration ? '· ' + Math.round(route.total_duration / 60) + ' min' : '' }}
+                {{ route.total_duration ? '· ' + formatDuration(route.total_duration) : '' }}
               </span>
             </div>
             <span v-if="focused === idx" class="legend-active-dot" />
@@ -218,7 +218,7 @@ function renderRouteGroups() {
         <strong>${route.vehicle?.name ?? 'Vehículo'}</strong><br/>
         🛑 ${route.stops.length} paradas<br/>
         📍 ${route.total_distance ? (route.total_distance / 1000).toFixed(1) + ' km' : '—'}<br/>
-        ⏱ ${route.total_duration ? Math.round(route.total_duration / 60) + ' min' : '—'}
+        ⏱ ${route.total_duration ? formatDuration(route.total_duration) : '—'}
       `)
       .addTo(group)
 
@@ -259,6 +259,28 @@ function focusRoute(idxClicked) {
   // Click en la misma ruta o en null → quitar filtro
   focused.value = (idxClicked === null || focused.value === idxClicked) ? null : idxClicked
   applyFocus()
+}
+
+function formatDuration(totalSeconds) {
+  const totalMinutes = Math.max(0, Math.round(totalSeconds / 60))
+  const days = Math.floor(totalMinutes / 1440)
+  const remainingMinutesAfterDays = totalMinutes % 1440
+  const hours = Math.floor(remainingMinutesAfterDays / 60)
+  const minutes = remainingMinutesAfterDays % 60
+
+  const parts = []
+
+  if (days > 0) {
+    parts.push(`${days} ${days === 1 ? 'día' : 'días'}`)
+  }
+
+  if (hours > 0 || days > 0) {
+    parts.push(`${hours} ${hours === 1 ? 'hora' : 'horas'}`)
+  }
+
+  parts.push(`${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`)
+
+  return parts.join(', ')
 }
 
 function applyFocus() {

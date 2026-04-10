@@ -9,6 +9,7 @@
           {{ vehicles.length }} vehículos ·
           {{ routes.length }} rutas optimizadas ·
           {{ completedRoutes.length }} rutas históricas ·
+          {{ unassignedOrders.length }} no asignados ·
           {{ totalDistanceKm.toFixed(1) }} km totales
         </p>
       </div>
@@ -111,6 +112,14 @@
       <RouteList :routes="routes" :allow-delivery="true" :loading-order-ids="loadingOrderIds" @mark-delivered="handleMarkDelivered" />
     </section>
 
+    <section v-if="unassignedOrders.length > 0" class="card routes-section">
+      <h2 class="card__title">⚠ Pedidos No Asignados</h2>
+      <p class="unassigned-copy">
+        Estos pedidos no pudieron ser incluidos en la última optimización con el vehículo seleccionado.
+      </p>
+      <OrderList :orders="unassignedOrders" />
+    </section>
+
     <section class="card routes-section">
       <h2 class="card__title">🗂 Historial de Rutas Completadas</h2>
       <div v-if="completedRoutes.length > 0" class="route-summary-list">
@@ -194,6 +203,7 @@ const loading  = ref(false)
 const alert    = ref(null)
 const loadingOrderIds = ref([])
 const selectedVehicleId = ref('')
+const unassignedOrders = ref([])
 
 const showVehicleModal = ref(false)
 const vForm = ref({ name: '', start_address: '', capacity: '', max_route_distance_km: '', start_lat: '', start_lng: '' })
@@ -254,6 +264,8 @@ async function handleOptimize() {
   alert.value   = null
   try {
     const res = await vrpApi.optimizeRoutes(Number(selectedVehicleId.value))
+    routes.value = res.data.data.routes
+    unassignedOrders.value = res.data.data.unassigned_orders
     showAlert('success', res.data.message)
     await loadAll()
   } catch (err) {
@@ -272,6 +284,7 @@ async function handleClear() {
   loading.value = true
   try {
     await vrpApi.clearRoutes()
+    unassignedOrders.value = []
     showAlert('success', 'Rutas eliminadas. Pedidos restablecidos.')
     await loadAll()
   } catch (err) {
@@ -459,6 +472,12 @@ function showAlert(type, message) {
 .route-summary-item__value {
   white-space: nowrap;
   color: #0f172a;
+}
+
+.unassigned-copy {
+  margin-bottom: .85rem;
+  color: var(--color-muted);
+  font-size: .86rem;
 }
 
 /* ── Layout principal ── */

@@ -34,12 +34,17 @@ class RouteOptimizationController extends Controller
 
         try {
             $vehicle = Vehicle::findOrFail($data['vehicle_id']);
-            $routes = $this->optimizer->optimize($vehicle->id);
+            $result = $this->optimizer->optimize($vehicle->id);
+            $routes = $result['routes'];
+            $unassignedOrders = $result['unassigned_orders'];
 
             return response()->json([
                 'success' => true,
-                'message' => count($routes) . ' ruta(s) optimizadas correctamente para ' . $vehicle->name . '.',
-                'data'    => $routes,
+                'message' => $this->buildOptimizeMessage($vehicle->name, count($routes), count($unassignedOrders)),
+                'data'    => [
+                    'routes' => $routes,
+                    'unassigned_orders' => $unassignedOrders,
+                ],
             ]);
         } catch (RuntimeException $e) {
             return response()->json([
@@ -247,5 +252,18 @@ class RouteOptimizationController extends Controller
             'status' => $anyDelivered ? 'in_progress' : 'optimized',
             'completed_at' => null,
         ]);
+    }
+
+    private function buildOptimizeMessage(string $vehicleName, int $routeCount, int $unassignedCount): string
+    {
+        if ($routeCount === 0 && $unassignedCount > 0) {
+            return 'No se generaron rutas para ' . $vehicleName . '. ' . $unassignedCount . ' pedido(s) quedaron sin asignar.';
+        }
+
+        if ($unassignedCount > 0) {
+            return $routeCount . ' ruta(s) optimizadas correctamente para ' . $vehicleName . '. ' . $unassignedCount . ' pedido(s) quedaron sin asignar.';
+        }
+
+        return $routeCount . ' ruta(s) optimizadas correctamente para ' . $vehicleName . '.';
     }
 }

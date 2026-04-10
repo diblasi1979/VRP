@@ -82,7 +82,7 @@
 
           <div class="history-route-card__stats">
             <span>📍 {{ formatDistance(route) }}</span>
-            <span v-if="route.total_duration">⏱ {{ Math.round(route.total_duration / 60) }} min</span>
+            <span v-if="route.total_duration">⏱ {{ formatDuration(route.total_duration) }}</span>
             <span>Ver detalle</span>
           </div>
         </article>
@@ -182,6 +182,28 @@ const totalStops = computed(() => routes.value.reduce((sum, route) => sum + rout
 
 function formatDistance(route) {
   return `${(Number(route.total_distance_km) || 0).toFixed(1)} km`
+}
+
+function formatDuration(totalSeconds) {
+  const totalMinutes = Math.max(0, Math.round(totalSeconds / 60))
+  const days = Math.floor(totalMinutes / 1440)
+  const remainingMinutesAfterDays = totalMinutes % 1440
+  const hours = Math.floor(remainingMinutesAfterDays / 60)
+  const minutes = remainingMinutesAfterDays % 60
+
+  const parts = []
+
+  if (days > 0) {
+    parts.push(`${days} ${days === 1 ? 'día' : 'días'}`)
+  }
+
+  if (hours > 0 || days > 0) {
+    parts.push(`${hours} ${hours === 1 ? 'hora' : 'horas'}`)
+  }
+
+  parts.push(`${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`)
+
+  return parts.join(', ')
 }
 
 function formatDate(value) {
