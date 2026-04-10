@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Route;
+use App\Models\RouteStop;
 use App\Models\Vehicle;
 use App\Services\RouteOptimizerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use RuntimeException;
 
@@ -56,9 +58,22 @@ class RouteOptimizationController extends Controller
     /**
      * Devuelve todas las rutas con vehículo y paradas (con pedido incluido).
      */
-    public function routes(): JsonResponse
+    public function routes(Request $request): JsonResponse
     {
-        $routes = Route::with(['vehicle', 'stops.order'])
+        $request->validate([
+            'status' => ['nullable', Rule::in(['active', 'pending', 'optimized', 'in_progress', 'completed'])],
+        ]);
+
+        $query = Route::with(['vehicle', 'stops.order']);
+
+        match ($request->input('status', 'active')) {
+            'active' => $query->whereIn('status', ['pending', 'optimized', 'in_progress']),
+            'pending', 'optimized', 'in_progress', 'completed' => $query->where('status', $request->status),
+            default => null,
+        };
+
+        $routes = $query
+            ->orderByDesc('completed_at')
             ->latest()
             ->get();
 
@@ -150,9 +165,12 @@ class RouteOptimizationController extends Controller
             'status' => ['required', Rule::in(['pending', 'assigned', 'delivered'])],
         ]);
 
-        $order->update($data);
+        DB::transaction(function () use ($order, $data) {
+            $order->update($data);
+            $this->syncRouteStatusForOrder($order->fresh());
+        });
 
-        return response()->json(['success' => true, 'data' => $order]);
+        return response()->json(['success' => true, 'data' => $order->fresh()]);
     }
 
     // -----------------------------------------------------------------------
@@ -165,9 +183,44 @@ class RouteOptimizationController extends Controller
      */
     public function clearRoutes(): JsonResponse
     {
-        Route::query()->delete();
+        Route::whereIn('status', ['pending', 'optimized', 'in_progress'])->delete();
         Order::where('status', 'assigned')->update(['status' => 'pending']);
 
-        return response()->json(['success' => true, 'message' => 'Rutas eliminadas. Pedidos restablecidos a pending.']);
+        return response()->json(['success' => true, 'message' => 'Rutas activas eliminadas. El historial de rutas completadas se conserva.']);
+    }
+
+    private function syncRouteStatusForOrder(Order $order): void
+    {
+        $routeStop = RouteStop::with(['route.stops.order'])->where('order_id', $order->id)->first();
+
+        if (!$routeStop || !$routeStop->route) {
+            return;
+        }
+
+        $route = $routeStop->route;
+        $orders = $route->stops
+            ->pluck('order')
+            ->filter();
+
+        if ($orders->isEmpty()) {
+            return;
+        }
+
+        $allDelivered = $orders->every(fn (Order $stopOrder) => $stopOrder->status === 'delivered');
+        $anyDelivered = $orders->contains(fn (Order $stopOrder) => $stopOrder->status === 'delivered');
+
+        if ($allDelivered) {
+            $route->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+            ]);
+
+            return;
+        }
+
+        $route->update([
+            'status' => $anyDelivered ? 'in_progress' : 'optimized',
+            'completed_at' => null,
+        ]);
     }
 }

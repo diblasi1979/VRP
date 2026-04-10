@@ -29,8 +29,8 @@ export default {
   },
 
   // Rutas
-  getRoutes() {
-    return api.get('/routes')
+  getRoutes(status = null) {
+    return api.get('/routes', { params: status ? { status } : {} })
   },
 
   clearRoutes() {

@@ -193,6 +193,63 @@ Abrir en el navegador: **http://localhost:5173**
 
 ---
 
+## Docker
+
+También puedes levantar todo el proyecto con Docker Compose en modo desarrollo.
+
+### Requisitos
+
+- Docker Desktop
+- Puerto `5173` libre para el frontend
+- Puerto `8000` libre para el backend
+
+### Primer arranque
+
+```bash
+docker compose up --build
+```
+
+Servicios disponibles:
+
+- Frontend: **http://localhost:5173**
+- Backend API: **http://localhost:8000/api**
+
+Qué hace el contenedor backend al iniciar:
+
+- crea `backend/.env` si no existe
+- crea `backend/database/database.sqlite` si no existe
+- ejecuta `composer install`
+- genera `APP_KEY` si falta
+- corre migraciones
+- ejecuta seeders solo en el primer arranque de una base nueva
+
+### OpenRouteService API key
+
+Si quieres usar la optimización real contra ORS, define `ORS_API_KEY` en `backend/.env`.
+
+Ejemplo:
+
+```env
+ORS_API_KEY=tu_api_key
+```
+
+### Reiniciar desde cero
+
+Para reinstalar dependencias de contenedor y volver a arrancar:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+Si además quieres regenerar los datos demo de SQLite, elimina `backend/database/database.sqlite` o ejecuta:
+
+```bash
+docker compose exec backend php artisan migrate:fresh --seed
+```
+
+---
+
 ## Variables de Entorno
 
 Archivo: `backend/.env`
@@ -236,7 +293,8 @@ routes
 ├── total_distance (metros)
 ├── total_duration (segundos)
 ├── status         (pending | optimized | in_progress | completed)
-└── optimized_at
+├── optimized_at
+└── completed_at   (fecha de cierre para historial)
 
 route_stops
 ├── id
@@ -259,8 +317,8 @@ Base URL: `http://localhost:8000/api`
 | `PATCH` | `/orders/{id}/status` | Actualiza el estado de un pedido |
 | `GET` | `/vehicles` | Lista todos los vehículos |
 | `POST` | `/vehicles` | Crea un nuevo vehículo |
-| `GET` | `/routes` | Lista todas las rutas con vehículo y paradas |
-| `DELETE` | `/routes` | Elimina todas las rutas y restablece pedidos a `pending` |
+| `GET` | `/routes` | Lista rutas con vehículo y paradas. Acepta `?status=active|pending|optimized|in_progress|completed` |
+| `DELETE` | `/routes` | Elimina solo rutas activas y restablece pedidos `assigned` a `pending` |
 | `POST` | `/optimize-routes` | **Endpoint principal**: ejecuta la optimización VRP |
 
 ### Ejemplo — POST /api/orders
@@ -288,6 +346,7 @@ Base URL: `http://localhost:8000/api`
       "id": 1,
       "vehicle_id": 1,
       "total_distance": 45230,
+      "total_distance_km": 45.2,
       "total_duration": 5400,
       "status": "optimized",
       "vehicle": { "id": 1, "name": "Furgón BA-01", "capacity": 800 },
@@ -319,6 +378,7 @@ Base URL: `http://localhost:8000/api`
 ### Route
 
 - Relación `stops()` — Devuelve las paradas ordenadas por `stop_sequence`.
+- Cuando todas sus paradas quedan en `delivered`, la ruta se marca como `completed` y se conserva como historial.
 
 ### RouteStop
 
@@ -346,6 +406,7 @@ Orquestador principal:
 3. Llama a `OpenRouteServiceClient::optimize()`
 4. Persiste rutas y paradas en una transacción DB
 5. Marca los pedidos involucrados como `assigned`
+6. Cuando todas las paradas de una ruta se informan como entregadas, la ruta pasa a `completed` y queda disponible para consultas históricas
 
 ---
 
@@ -353,7 +414,7 @@ Orquestador principal:
 
 ### `Dashboard.vue`
 
-Vista principal. Gestiona estado global (ordenes, vehículos, rutas), acciones (optimizar, limpiar, recargar) y muestra alertas con auto-cierre a los 6 segundos.
+Vista principal. Gestiona estado global (ordenes, vehículos, rutas activas e historial), acciones (optimizar, limpiar, recargar) y muestra alertas con auto-cierre a los 6 segundos.
 
 ### `MapView.vue`
 
@@ -370,6 +431,7 @@ Mapa interactivo basado en **Leaflet + OpenStreetMap**:
 Lista de rutas generadas:
 - Cabecera con nombre del vehículo, distancia total, duración y número de paradas
 - Paradas ordenadas con secuencia, dirección, hora estimada, peso y ventana horaria
+- Se reutiliza tanto para rutas activas como para rutas completadas guardadas en historial
 
 ### `OrderList.vue`
 

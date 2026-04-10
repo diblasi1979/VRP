@@ -7,7 +7,9 @@
         <p class="action-bar__sub">
           {{ orders.length }} pedidos ·
           {{ vehicles.length }} vehículos ·
-          {{ routes.length }} rutas optimizadas
+          {{ routes.length }} rutas optimizadas ·
+          {{ completedRoutes.length }} rutas históricas ·
+          {{ totalDistanceKm.toFixed(1) }} km totales
         </p>
       </div>
       <div class="action-bar__buttons">
@@ -87,7 +89,29 @@
     <!-- ── Rutas ─────────────────────────────────────────────────────── -->
     <section class="card routes-section">
       <h2 class="card__title">📋 Rutas Generadas</h2>
+      <div v-if="routes.length > 0" class="route-summary-list">
+        <div v-for="route in routes" :key="route.id" class="route-summary-item">
+          <span class="route-summary-item__name">{{ route.vehicle?.name ?? `Vehículo #${route.vehicle_id}` }}</span>
+          <strong class="route-summary-item__value">{{ formatRouteDistance(route) }}</strong>
+        </div>
+      </div>
       <RouteList :routes="routes" />
+    </section>
+
+    <section class="card routes-section">
+      <h2 class="card__title">🗂 Historial de Rutas Completadas</h2>
+      <div v-if="completedRoutes.length > 0" class="route-summary-list">
+        <div v-for="route in completedRoutes" :key="route.id" class="route-summary-item">
+          <span class="route-summary-item__name">
+            {{ route.vehicle?.name ?? `Vehículo #${route.vehicle_id}` }}
+            <small v-if="route.completed_at" class="route-summary-item__date">
+              {{ new Date(route.completed_at).toLocaleString('es-AR') }}
+            </small>
+          </span>
+          <strong class="route-summary-item__value">{{ formatRouteDistance(route) }}</strong>
+        </div>
+      </div>
+      <RouteList :routes="completedRoutes" />
     </section>
     <!-- ── Modal: agregar vehículo ────────────────────────────────────────────── -->
     <transition name="fade">
@@ -148,6 +172,7 @@ const ROUTE_PALETTE = [
 const orders   = ref([])
 const vehicles = ref([])
 const routes   = ref([])
+const completedRoutes = ref([])
 const loading  = ref(false)
 const alert    = ref(null)
 
@@ -161,14 +186,16 @@ onMounted(loadAll)
 
 async function loadAll() {
   try {
-    const [ordersRes, vehiclesRes, routesRes] = await Promise.all([
+    const [ordersRes, vehiclesRes, routesRes, completedRoutesRes] = await Promise.all([
       vrpApi.getOrders(),
       vrpApi.getVehicles(),
-      vrpApi.getRoutes(),
+      vrpApi.getRoutes('active'),
+      vrpApi.getRoutes('completed'),
     ])
     orders.value   = ordersRes.data.data
     vehicles.value = vehiclesRes.data.data
     routes.value   = routesRes.data.data
+    completedRoutes.value = completedRoutesRes.data.data
   } catch (err) {
     showAlert('error', 'No se pudo conectar con el backend. ¿Está Laravel corriendo en :8000?')
     console.error(err)
@@ -240,6 +267,26 @@ const vehicleColor = computed(() => {
   return map
 })
 
+const totalDistanceKm = computed(() => {
+  return routes.value.reduce((sum, route) => sum + getRouteDistanceKm(route), 0)
+})
+
+function getRouteDistanceKm(route) {
+  if (route.total_distance_km !== null && route.total_distance_km !== undefined) {
+    return Number(route.total_distance_km)
+  }
+
+  if (route.total_distance !== null && route.total_distance !== undefined) {
+    return route.total_distance / 1000
+  }
+
+  return 0
+}
+
+function formatRouteDistance(route) {
+  return `${getRouteDistanceKm(route).toFixed(1)} km`
+}
+
 // -----------------------------------------------------------------------
 // Alertas
 // -----------------------------------------------------------------------
@@ -300,6 +347,41 @@ function showAlert(type, message) {
   margin-bottom: .75rem;
   padding-bottom: .5rem;
   border-bottom: 1px solid var(--color-border);
+}
+
+.route-summary-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+.route-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  padding: .8rem .9rem;
+  border: 1px solid var(--color-border);
+  border-radius: .8rem;
+  background: #f8fafc;
+}
+
+.route-summary-item__name {
+  display: flex;
+  flex-direction: column;
+  font-size: .85rem;
+  color: #0f172a;
+}
+
+.route-summary-item__date {
+  font-size: .72rem;
+  color: var(--color-muted);
+}
+
+.route-summary-item__value {
+  white-space: nowrap;
+  color: #0f172a;
 }
 
 /* ── Layout principal ── */

@@ -17,8 +17,11 @@
           <strong>{{ route.vehicle?.name ?? `Vehículo #${route.vehicle_id}` }}</strong>
           <span class="badge badge-optimized">{{ route.status }}</span>
         </div>
+        <div v-if="route.total_distance_km !== null" class="route-card__distance">
+          <span class="route-card__distance-label">Distancia</span>
+          <strong>{{ formatDistance(route) }}</strong>
+        </div>
         <div class="route-card__meta">
-          <span v-if="route.total_distance">📍 {{ (route.total_distance / 1000).toFixed(1) }} km</span>
           <span v-if="route.total_duration">⏱ {{ Math.round(route.total_duration / 60) }} min</span>
           <span>🛑 {{ route.stops.length }} paradas</span>
         </div>
@@ -52,6 +55,18 @@
 defineProps({
   routes: { type: Array, default: () => [] },
 })
+
+function formatDistance(route) {
+  if (route.total_distance_km !== null && route.total_distance_km !== undefined) {
+    return `${route.total_distance_km.toFixed(1)} km`
+  }
+
+  if (route.total_distance !== null && route.total_distance !== undefined) {
+    return `${(route.total_distance / 1000).toFixed(1)} km`
+  }
+
+  return '—'
+}
 
 const routeColors = [
   '#2563eb', '#dc2626', '#16a34a', '#d97706',
@@ -90,11 +105,33 @@ const routeColors = [
 
 .route-card__title { display: flex; align-items: center; gap: .5rem; flex: 1; }
 
+.route-card__distance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 92px;
+  color: #0f172a;
+}
+
+.route-card__distance-label {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--color-muted);
+}
+
 .route-card__meta {
   display: flex;
   gap: .75rem;
   font-size: .8rem;
   color: var(--color-muted);
+}
+
+@media (max-width: 700px) {
+  .route-card__distance {
+    align-items: flex-start;
+    min-width: auto;
+  }
 }
 
 /* Paradas */

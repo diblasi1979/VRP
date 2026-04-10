@@ -138,8 +138,8 @@ class RouteOptimizerService
                 // Crear la ruta
                 $route = Route::create([
                     'vehicle_id'     => $vehicle->id,
-                    'total_distance' => $orsRoute['summary']['distance'] ?? null,  // metros
-                    'total_duration' => $orsRoute['summary']['duration'] ?? null,  // segundos
+                    'total_distance' => $this->resolveRouteDistance($orsRoute),
+                    'total_duration' => $this->resolveRouteDuration($orsRoute),
                     'status'         => 'optimized',
                     'optimized_at'   => now(),
                 ]);
@@ -205,5 +205,45 @@ class RouteOptimizerService
         $m = intdiv($seconds % 3600, 60);
 
         return sprintf('%02d:%02d', $h, $m);
+    }
+
+    /**
+     * Obtiene la distancia real de la ruta devuelta por ORS en metros.
+     * Prioriza el summary y, si no viene, suma las distancias de los steps.
+     */
+    private function resolveRouteDistance(array $orsRoute): ?float
+    {
+        $summaryDistance = $orsRoute['summary']['distance'] ?? null;
+
+        if (is_numeric($summaryDistance)) {
+            return (float) $summaryDistance;
+        }
+
+        $stepDistance = collect($orsRoute['steps'] ?? [])
+            ->pluck('distance')
+            ->filter(fn ($distance) => is_numeric($distance))
+            ->sum();
+
+        return $stepDistance > 0 ? (float) $stepDistance : null;
+    }
+
+    /**
+     * Obtiene la duración total de la ruta en segundos.
+     * Prioriza el summary y usa los steps como respaldo.
+     */
+    private function resolveRouteDuration(array $orsRoute): ?int
+    {
+        $summaryDuration = $orsRoute['summary']['duration'] ?? null;
+
+        if (is_numeric($summaryDuration)) {
+            return (int) round($summaryDuration);
+        }
+
+        $stepDuration = collect($orsRoute['steps'] ?? [])
+            ->pluck('duration')
+            ->filter(fn ($duration) => is_numeric($duration))
+            ->sum();
+
+        return $stepDuration > 0 ? (int) round($stepDuration) : null;
     }
 }
