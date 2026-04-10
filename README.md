@@ -47,7 +47,7 @@ El resultado es una ruta optimizada para el vehículo elegido, respetando su lí
 │   Vue 3 + Vite  ·  Leaflet (OSM)  ·  Axios               │
 │   Dashboard → MapView / RouteList / OrderList             │
 └──────────────────────────┬────────────────────────────────┘
-                           │ HTTP / JSON  (proxy :5173 → :8000)
+                           │ HTTP / JSON  (proxy :5100 → :8009)
 ┌──────────────────────────▼────────────────────────────────┐
 │                        BACKEND                            │
 │   Laravel 13 (PHP 8.4)                                    │
@@ -104,7 +104,7 @@ VRP/
 │   ├── routes/
 │   │   └── api.php                 # Definición de endpoints
 │   ├── config/
-│   │   ├── cors.php                # CORS habilitado para localhost:5173
+│   │   ├── cors.php                # CORS habilitado para localhost:5100
 │   │   └── services.php            # Configuración ORS API key
 │   └── .env                        # Variables de entorno (no versionado)
 │
@@ -123,7 +123,7 @@ VRP/
     │   └── assets/
     │       └── main.css            # Estilos globales (custom properties)
     ├── index.html
-    ├── vite.config.js              # Proxy /api → :8000
+    ├── vite.config.js              # Proxy /api → :8009
     └── package.json
 ```
 
@@ -183,14 +183,14 @@ npm install
 ```bash
 # Terminal 1 — Backend
 cd backend
-php artisan serve --host=127.0.0.1 --port=8000
+php artisan serve --host=127.0.0.1 --port=8009
 
 # Terminal 2 — Frontend
 cd frontend
 npm run dev
 ```
 
-Abrir en el navegador: **http://localhost:5173**
+Abrir en el navegador: **http://localhost:5100**
 
 ---
 
@@ -201,8 +201,8 @@ También puedes levantar todo el proyecto con Docker Compose en modo desarrollo.
 ### Requisitos
 
 - Docker Desktop
-- Puerto `5173` libre para el frontend
-- Puerto `8000` libre para el backend
+- Puerto `5100` libre para el frontend
+- Puerto `8009` libre para el backend
 
 ### Primer arranque
 
@@ -212,8 +212,8 @@ docker compose up --build
 
 Servicios disponibles:
 
-- Frontend: **http://localhost:5173**
-- Backend API: **http://localhost:8000/api**
+- Frontend: **http://localhost:5100**
+- Backend API: **http://localhost:8009/api**
 
 Qué hace el contenedor backend al iniciar:
 
@@ -258,7 +258,7 @@ Archivo: `backend/.env`
 | Variable | Descripción | Ejemplo |
 |---|---|---|
 | `APP_KEY` | Clave de cifrado de Laravel | `base64:...` (generada con `key:generate`) |
-| `APP_URL` | URL del servidor backend | `http://localhost:8000` |
+| `APP_URL` | URL del servidor backend | `http://localhost:8009` |
 | `DB_CONNECTION` | Motor de base de datos | `sqlite` ó `mysql` |
 | `DB_DATABASE` | Ruta a SQLite o nombre de la DB | `database/database.sqlite` |
 | `ORS_API_KEY` | API key de OpenRouteService | `5b3ce3...` |
@@ -310,7 +310,7 @@ route_stops
 
 ## API REST
 
-Base URL: `http://localhost:8000/api`
+Base URL: `http://localhost:8009/api`
 
 | Método | Endpoint | Descripción |
 |---|---|---|

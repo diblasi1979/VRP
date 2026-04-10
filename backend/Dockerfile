@@ -8,4 +8,4 @@ COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 WORKDIR /var/www/html
 
-EXPOSE 8000
+EXPOSE 8009

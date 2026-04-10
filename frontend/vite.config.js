@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
-const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8000'
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8009'
 
 export default defineConfig({
   plugins: [vue()],
@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: 5100,
     proxy: {
       // Redirige /api/* al servidor Laravel
       '/api': {
