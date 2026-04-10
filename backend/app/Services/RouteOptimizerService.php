@@ -20,6 +20,8 @@ use RuntimeException;
  */
 class RouteOptimizerService
 {
+    private const LOAD_PRECISION = 1000;
+
     public function __construct(
         private readonly OpenRouteServiceClient $orsClient
     ) {}
@@ -87,7 +89,7 @@ class RouteOptimizerService
             return [
                 'id'           => $order->id,
                 'location'     => [$order->lng, $order->lat], // ORS usa [lng, lat]
-                'amount'       => [(int) round($order->weight)],
+                'amount'       => [$this->normalizeLoad($order->weight)],
                 'time_windows' => [[$twStart, $twEnd]],
                 'description'  => $order->address,
             ];
@@ -99,7 +101,8 @@ class RouteOptimizerService
                 'profile'  => 'driving-car',
                 'start'    => [$vehicle->start_lng, $vehicle->start_lat],
                 'end'      => [$vehicle->start_lng, $vehicle->start_lat],
-                'capacity' => [(int) round($vehicle->capacity)],
+                'capacity' => [$this->normalizeLoad($vehicle->capacity)],
+                'max_distance' => $this->kmToMeters($vehicle->max_route_distance_km),
             ];
         })->values()->toArray();
 
@@ -257,5 +260,19 @@ class RouteOptimizerService
             ->sum();
 
         return $stepDuration > 0 ? (int) round($stepDuration) : null;
+    }
+
+    /**
+     * ORS requiere amounts/capacities enteros positivos.
+     * Escalamos los valores decimales para no perder precisión ni generar ceros inválidos.
+     */
+    private function normalizeLoad(float $value): int
+    {
+        return max(1, (int) ceil($value * self::LOAD_PRECISION));
+    }
+
+    private function kmToMeters(?float $value): int
+    {
+        return max(1, (int) round(($value ?? 0) * 1000));
     }
 }

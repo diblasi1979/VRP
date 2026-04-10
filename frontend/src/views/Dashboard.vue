@@ -18,7 +18,7 @@
           <select v-model="selectedVehicleId" :disabled="loading || availableVehicles.length === 0">
             <option value="">Seleccionar vehículo</option>
             <option v-for="vehicle in availableVehicles" :key="vehicle.id" :value="String(vehicle.id)">
-              {{ vehicle.name }} · {{ vehicle.capacity }} kg
+              {{ vehicle.name }} · {{ vehicle.capacity }} kg · {{ formatVehicleDistanceLimit(vehicle) }} km
             </option>
           </select>
         </label>
@@ -82,6 +82,7 @@
                 <span v-if="v.start_address" class="vehicle-origin">📍 {{ v.start_address }}</span>
               </span>
               <span class="vehicle-cap">{{ v.capacity }} kg</span>
+              <span class="vehicle-cap">{{ formatVehicleDistanceLimit(v) }} km</span>
               <span :class="['vehicle-status', v.is_available ? 'vehicle-status--available' : 'vehicle-status--busy']">
                 {{ v.is_available ? 'Libre' : 'Ocupado' }}
               </span>
@@ -144,6 +145,10 @@
                 Capacidad (kg) *
                 <input v-model.number="vForm.capacity" type="number" min="1" step="0.01" required placeholder="500" />
               </label>
+              <label class="modal__label">
+                Límite por ruta (km) *
+                <input v-model.number="vForm.max_route_distance_km" type="number" min="1" step="0.01" required placeholder="120" />
+              </label>
             </div>
             <div class="modal__row">
               <label class="modal__label">
@@ -191,7 +196,7 @@ const loadingOrderIds = ref([])
 const selectedVehicleId = ref('')
 
 const showVehicleModal = ref(false)
-const vForm = ref({ name: '', start_address: '', capacity: '', start_lat: '', start_lng: '' })
+const vForm = ref({ name: '', start_address: '', capacity: '', max_route_distance_km: '', start_lat: '', start_lng: '' })
 
 // -----------------------------------------------------------------------
 // Carga inicial
@@ -225,7 +230,7 @@ async function handleAddVehicle() {
   try {
     await vrpApi.createVehicle(vForm.value)
     showVehicleModal.value = false
-    vForm.value = { name: '', start_address: '', capacity: '', start_lat: '', start_lng: '' }
+    vForm.value = { name: '', start_address: '', capacity: '', max_route_distance_km: '', start_lat: '', start_lng: '' }
     await loadAll()
     showAlert('success', 'Vehículo agregado correctamente.')
   } catch (err) {
@@ -327,6 +332,10 @@ function getRouteDistanceKm(route) {
 
 function formatRouteDistance(route) {
   return `${getRouteDistanceKm(route).toFixed(1)} km`
+}
+
+function formatVehicleDistanceLimit(vehicle) {
+  return Number(vehicle.max_route_distance_km || 0).toFixed(0)
 }
 
 function syncSelectedVehicle() {

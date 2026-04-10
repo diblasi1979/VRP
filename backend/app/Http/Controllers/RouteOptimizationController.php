@@ -170,6 +170,7 @@ class RouteOptimizationController extends Controller
             'name'          => 'required|string|max:100',
             'start_address' => 'nullable|string|max:255',
             'capacity'      => 'required|numeric|min:1',
+            'max_route_distance_km' => 'required|numeric|min:1',
             'start_lat'     => 'required|numeric|between:-90,90',
             'start_lng'     => 'required|numeric|between:-180,180',
         ]);

@@ -30,6 +30,7 @@ Sistema de gestión de transporte (**TMS**) con optimización de rutas VRP (*Veh
 VRP TMS permite generar rutas optimizadas a partir de un vehículo libre seleccionado, teniendo en cuenta:
 
 - **Capacidad de carga** de cada vehículo (kg)
+- **Límite máximo de kilómetros** por ruta para cada vehículo
 - **Ventanas horarias** de entrega por pedido (ej. 09:00–12:00)
 - **Ubicación geográfica** de cada pedido (lat/lng)
 - **Depósito central** como punto de inicio y fin de cada ruta
@@ -284,6 +285,7 @@ vehicles
 ├── id
 ├── name
 ├── capacity       (kg máximos)
+├── max_route_distance_km   (km máximos por ruta)
 ├── start_lat / start_lng   (depósito/origen)
 └── is_active
 
@@ -317,7 +319,7 @@ Base URL: `http://localhost:8000/api`
 | `PATCH` | `/orders/{id}/status` | Actualiza el estado de u
 .n pedido |
 | `GET` | `/vehicles` | Lista todos los vehículos e informa si están libres mediante `is_available` |
-| `POST` | `/vehicles` | Crea un nuevo vehículo |
+| `POST` | `/vehicles` | Crea un nuevo vehículo con capacidad y límite máximo de km por ruta |
 | `GET` | `/routes` | Lista rutas con vehículo y paradas. Acepta `?status=active|pending|optimized|in_progress|completed`, `?vehicle_id=` y `?date_from=&date_to=` |
 | `DELETE` | `/routes` | Elimina solo rutas activas y restablece pedidos `assigned` a `pending` |
 | `POST` | `/optimize-routes` | **Endpoint principal**: ejecuta la optimización VRP para un `vehicle_id` libre |
@@ -358,7 +360,7 @@ Base URL: `http://localhost:8000/api`
       "total_distance_km": 45.2,
       "total_duration": 5400,
       "status": "optimized",
-      "vehicle": { "id": 1, "name": "Furgón BA-01", "capacity": 800 },
+      "vehicle": { "id": 1, "name": "Furgón BA-01", "capacity": 800, "max_route_distance_km": 120 },
       "stops": [
         {
           "stop_sequence": 1,
@@ -413,7 +415,7 @@ Orquestador principal:
 1. Recibe el `vehicle_id` seleccionado desde la UI
 2. Valida que el vehículo esté `is_active = true` y sin rutas activas
 3. Filtra pedidos `pending` cuyo peso no supere la capacidad del vehículo
-4. Construye el payload VRP (jobs + vehículo) en formato ORS
+4. Construye el payload VRP (jobs + vehículo) en formato ORS, incluyendo `max_distance`
 5. Llama a `OpenRouteServiceClient::optimize()`
 6. Persiste la ruta y sus paradas en una transacción DB
 7. Marca los pedidos involucrados como `assigned`
@@ -428,6 +430,8 @@ Orquestador principal:
 Vista principal. Gestiona estado global (ordenes, vehículos, rutas activas e historial), acciones (generar ruta, limpiar, recargar) y muestra alertas con auto-cierre a los 6 segundos.
 
 Antes de optimizar, obliga a seleccionar un vehículo libre y muestra su disponibilidad en la lista. Además permite marcar una parada como entregada desde la propia lista de rutas activas. Cuando todas las paradas de una ruta quedan entregadas, la ruta pasa automáticamente al historial.
+
+Al dar de alta un vehículo, también se define su límite máximo de kilómetros por ruta y ese valor se muestra en la selección del dashboard.
 
 ### `History.vue`
 
@@ -473,10 +477,10 @@ POST /api/optimize-routes { vehicle_id }
 RouteOptimizerService::optimize(vehicle_id)
         │
   ├─ 1. Valida que el vehículo siga libre
-  ├─ 2. Carga pedidos (status = 'pending') compatibles con su capacidad
+    ├─ 2. Carga pedidos (status = 'pending') compatibles con su capacidad
   ├─ 3. Construye payload VRP:
-        │       jobs:     [{ id, location:[lng,lat], amount:[kg], time_windows:[[ts_start,ts_end]] }]
-  │       vehicles: [{ id, profile:'driving-car', start:[lng,lat], end:[lng,lat], capacity:[kg] }]
+      │       jobs:     [{ id, location:[lng,lat], amount:[kg], time_windows:[[ts_start,ts_end]] }]
+    │       vehicles: [{ id, profile:'driving-car', start:[lng,lat], end:[lng,lat], capacity:[kg], max_distance:[m] }]
         │
         ├─ 4. POST https://api.openrouteservice.org/optimization
         │
@@ -527,9 +531,9 @@ El seeder `VrpSeeder` carga automáticamente:
 
 | Vehículo | Capacidad |
 |---|---|
-| Furgón BA-01 | 800 kg |
-| Furgón BA-02 | 600 kg |
-| Camioneta BA-03 | 400 kg |
+| Furgón BA-01 | 800 kg · 120 km |
+| Furgón BA-02 | 600 kg · 90 km |
+| Camioneta BA-03 | 400 kg · 70 km |
 
 **20 pedidos** distribuidos por Buenos Aires:
 

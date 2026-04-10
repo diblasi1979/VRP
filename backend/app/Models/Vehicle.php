@@ -18,16 +18,18 @@ class Vehicle extends Model
         'name',
         'start_address',
         'capacity',
+        'max_route_distance_km',
         'start_lat',
         'start_lng',
         'is_active',
     ];
 
     protected $casts = [
-        'capacity'  => 'float',
-        'start_lat' => 'float',
-        'start_lng' => 'float',
-        'is_active' => 'boolean',
+        'capacity'              => 'float',
+        'max_route_distance_km' => 'float',
+        'start_lat'             => 'float',
+        'start_lng'             => 'float',
+        'is_active'             => 'boolean',
     ];
 
     public function routes(): HasMany
